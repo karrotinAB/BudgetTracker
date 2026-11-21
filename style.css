@@ -1,30 +1,37 @@
 :root {
-  --bg: #f4f5f7;
-  --card: #ffffff;
-  --text: #191f28;
-  --sub: #6b7684;
-  --faint: #b0b8c1;
-  --line: #e5e8eb;
-  --red: #e5484d;
-  --blue: #2f6fed;
-  --accent: #2f6fed;
-  --today: #eaf1ff;
-  --radius: 16px;
+  --bg: #f4e6e2;
+  --card: #fffaf7;
+  --text: #3b2723;
+  --sub: #9b7f78;
+  --faint: #c9b3ad;
+  --line: #eddcd6;
+  --red: #c8384e;
+  --blue: #3e6db5;
+  --accent: #8b2d3d;
+  --accent-text: #ffffff;
+  --today: #f8e4e2;
+  --soft: #f6ebe7;
+  --hero: linear-gradient(120deg, #c9a097 0%, #d9b6a6 50%, #e6cdb4 100%);
+  --serif: "Noto Serif KR", "Nanum Myeongjo", serif;
+  --radius: 18px;
   --tab-h: 64px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #101114;
-    --card: #1b1d22;
-    --text: #eceef1;
-    --sub: #9aa3ad;
-    --faint: #5b626b;
-    --line: #2a2d33;
-    --red: #ff6b6f;
-    --blue: #6f9dff;
-    --accent: #6f9dff;
-    --today: #1f2a40;
+    --bg: #1d1615;
+    --card: #2a201e;
+    --text: #f3e6e2;
+    --sub: #b39a93;
+    --faint: #6e5b56;
+    --line: #3a2d2a;
+    --red: #ff7a8a;
+    --blue: #8fb0ec;
+    --accent: #d9798a;
+    --accent-text: #2a1517;
+    --today: #3a2626;
+    --soft: #33272a;
+    --hero: linear-gradient(120deg, #4a302c 0%, #5a3d34 50%, #5e4836 100%);
     color-scheme: dark;
   }
 }
@@ -32,7 +39,8 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; }
 body {
-  background: var(--bg);
+  background: var(--hero) top / 100% 190px no-repeat, var(--bg);
+  min-height: 100dvh;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
   font-size: 15px;
@@ -48,9 +56,9 @@ button { cursor: pointer; }
 .page {
   padding: calc(env(safe-area-inset-top) + 12px) 16px calc(var(--tab-h) + env(safe-area-inset-bottom) + 20px);
 }
-.page-title { font-size: 22px; font-weight: 700; margin: 8px 4px 16px; }
+.page-title { font-family: var(--serif); font-size: 28px; font-weight: 700; margin: 18px 4px 22px; color: var(--text); }
 
-.card { background: var(--card); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; }
+.card { background: var(--card); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(90, 40, 30, .05), 0 6px 20px rgba(90, 40, 30, .05); }
 .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; color: var(--sub); }
 
 /* 요약 */
@@ -62,7 +70,7 @@ button { cursor: pointer; }
 
 /* 달력 */
 .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.cal-head .month { font-size: 18px; font-weight: 700; }
+.cal-head .month { font-family: var(--serif); font-size: 19px; font-weight: 700; }
 .icon-btn {
   width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent;
   font-size: 20px; color: var(--sub);
@@ -97,16 +105,19 @@ button { cursor: pointer; }
 /* 버튼/입력 */
 .btn {
   width: 100%; height: 50px; border: 0; border-radius: 12px;
-  background: var(--accent); color: #fff; font-weight: 700; font-size: 16px;
+  background: var(--accent); color: var(--accent-text); font-weight: 700; font-size: 16px;
 }
 .btn:disabled { opacity: .5; }
-.btn.ghost { background: var(--line); color: var(--text); }
+.btn.ghost { background: var(--soft); color: var(--text); }
 .btn.small { width: auto; height: 44px; padding: 0 16px; font-size: 15px; }
 .input {
   width: 100%; height: 48px; border: 1px solid var(--line); border-radius: 12px;
   background: var(--card); padding: 0 14px; font-size: 16px; outline: none;
 }
 .input:focus { border-color: var(--accent); }
+select.input { appearance: none; -webkit-appearance: none; padding-right: 28px;
+  background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239b7f78'/%3E%3C/svg%3E") no-repeat right 12px center; }
+.chip { flex: none; font-size: 12px; font-weight: 600; color: var(--accent); background: var(--today); border-radius: 999px; padding: 3px 9px; }
 .field { margin-bottom: 10px; }
 .field label { display: block; font-size: 13px; color: var(--sub); margin: 0 0 6px 2px; }
 .money { position: relative; }
@@ -140,7 +151,7 @@ button { cursor: pointer; }
 .tabbar .inner { display: flex; width: 100%; max-width: 520px; }
 .tab { flex: 1; border: 0; background: transparent; color: var(--faint); font-size: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
 .tab svg { width: 24px; height: 24px; }
-.tab.on { color: var(--text); font-weight: 600; }
+.tab.on { color: var(--accent); font-weight: 700; }
 
 /* 바텀시트 */
 .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 20; animation: fade .15s; }
@@ -152,9 +163,9 @@ button { cursor: pointer; }
   animation: up .2s ease-out;
 }
 .sheet .grab { width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 14px; }
-.sheet h3 { margin: 0 0 4px; font-size: 19px; }
+.sheet h3 { margin: 0 0 4px; font-size: 20px; font-family: var(--serif); }
 .sheet .stats { display: flex; gap: 8px; margin: 14px 0; }
-.sheet .stat { flex: 1; background: var(--bg); border-radius: 12px; padding: 10px; text-align: center; }
+.sheet .stat { flex: 1; background: var(--soft); border-radius: 12px; padding: 10px; text-align: center; }
 .sheet .stat small { display: block; color: var(--sub); font-size: 12px; margin-bottom: 2px; }
 .sheet .stat b { font-size: 15px; }
 @keyframes up { from { transform: translateY(100%); } }
@@ -163,7 +174,7 @@ button { cursor: pointer; }
 /* 로그인 */
 .login { padding: calc(env(safe-area-inset-top) + 60px) 24px 40px; }
 .login .logo { width: 64px; height: 64px; border-radius: 16px; margin-bottom: 18px; }
-.login h1 { font-size: 26px; margin: 0 0 6px; }
+.login h1 { font-family: var(--serif); font-size: 30px; margin: 0 0 8px; }
 .login p.lead { color: var(--sub); margin: 0 0 28px; line-height: 1.5; }
 .login .err { color: var(--red); font-size: 13px; min-height: 18px; margin: 4px 2px 10px; }
 .login .or { text-align: center; color: var(--faint); font-size: 13px; margin: 18px 0; }
@@ -173,7 +184,7 @@ button { cursor: pointer; }
 #toast {
   position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 16px);
   transform: translateX(-50%) translateY(-20px); opacity: 0; pointer-events: none;
-  background: #191f28; color: #fff; padding: 10px 16px; border-radius: 20px; font-size: 14px;
+  background: var(--accent); color: var(--accent-text); padding: 10px 16px; border-radius: 20px; font-size: 14px;
   transition: .2s; z-index: 30; white-space: nowrap;
 }
 #toast.show { opacity: 1; transform: translateX(-50%); }

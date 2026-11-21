@@ -54,4 +54,24 @@ assert.equal(monthBases(mid, 2026, 10), null);
 // 7) 같은 날 다시 저장하면 교체
 assert.equal(upsertSnapshot(mid, '2026-11-21', 1).length, 1);
 
+// 8) 직전과 같은 값이면 스냅샷을 추가하지 않음 (재계산 오차 방지)
+assert.equal(upsertSnapshot(snaps, '2026-11-15', 2_000_000).length, 1);
+
+// 9) 추가 대지출 — 미리 등록하면 그 달 처음부터 반영
+const ex1 = [{ month: '2026-12', amount: 310_000, added: '2026-11-21' }];
+assert.equal(monthBases(snaps, 2026, 12, ex1)[0], Math.floor((2_000_000 - 310_000) / 31));
+// 다른 달엔 영향 없음
+assert.equal(monthBases(snaps, 2027, 1, ex1)[0], Math.floor(2_000_000 / 31));
+
+// 10) 추가 대지출 — 월 중간 등록이면 그날부터 남은 날에서 차감
+// 21일에 30만: (2,000,000 - 300,000 - 1,333,320) / 10 = 36,668
+const ex2 = [{ month: '2026-11', amount: 300_000, added: '2026-11-21' }];
+const b3 = monthBases(snaps, 2026, 11, ex2);
+assert.equal(b3[19], 66_666);
+assert.equal(b3[20], 36_668);
+const mo3 = computeMonth({ snapshots: snaps, days: {}, settings: { extras: ex2 } }, 2026, 11, '2026-11-21');
+assert.equal(mo3.budget, 2_000_000 - 300_000);
+// 다음 달 이월도 대지출 반영
+assert.equal(carryInto(snaps, {}, 2026, 12, ex2), 1_700_000);
+
 console.log('all logic tests passed');

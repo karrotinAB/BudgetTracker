@@ -1,5 +1,6 @@
 import {
   computeMonth, todayStr, daysInMonth, disposableOf, fixedTotal, upsertSnapshot, monthBases,
+  monthKey, extrasTotal,
 } from './logic.js';
 import {
   firebaseEnabled, watchAuth, startLocal, signInEmail, signUpEmail, signInGoogle, signOut,
@@ -281,8 +282,17 @@ function settingsHTML() {
   const y = now.getFullYear(), m = now.getMonth() + 1;
   const N = daysInMonth(y, m);
   const disp = disposableOf(st);
-  const bases = monthBases(S.data.snapshots, y, m);
-  const todayBase = bases ? bases[now.getDate() - 1] : Math.floor(disp / N);
+  const curKey = monthKey(y, m);
+  const extras = st.extras || [];
+  const exThis = extrasTotal(extras, curKey);
+  const bases = monthBases(S.data.snapshots, y, m, extras);
+  const todayBase = bases ? bases[now.getDate() - 1] : Math.floor((disp - exThis) / N);
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(y, m - 1 + i, 1);
+    return { key: monthKey(d.getFullYear(), d.getMonth() + 1), label: `${d.getFullYear() !== y ? `${d.getFullYear()}년 ` : ''}${d.getMonth() + 1}월` };
+  });
+  const labelOf = (k) => { const [yy, mm] = k.split('-').map(Number); return `${yy !== y ? `${yy}년 ` : ''}${mm}월`; };
+  const shownExtras = extras.filter((e) => e.month >= curKey).sort((a, b) => (a.month < b.month ? -1 : 1));
 
   return `
     <main class="page">
@@ -310,10 +320,34 @@ function settingsHTML() {
       </section>
 
       <section class="card">
+        <h2>추가 대지출</h2>
+        <p class="muted" style="margin:-4px 0 6px">그 달에만 나가는 큰 돈 (경조사비, 여행, 보험 연납 등). 그 달 남은 날짜에서 나눠 빠져요.</p>
+        <ul class="list" id="extraList">
+          ${shownExtras.map((e) => `
+            <li><span class="chip">${labelOf(e.month)}</span><span class="name">${esc(e.name)}</span><span class="amt num">${num(e.amount)}원</span>
+            <button class="del" data-id="${e.id}" aria-label="삭제">×</button></li>`).join('')
+            || '<li class="muted">등록된 추가 대지출이 없어요.</li>'}
+        </ul>
+        <form id="extraForm" style="margin-top:12px">
+          <div class="inline field">
+            <select class="input" name="month" style="flex:0 0 112px">
+              ${months.map((mo) => `<option value="${mo.key}">${mo.label}</option>`).join('')}
+            </select>
+            <input class="input" name="name" placeholder="항목 (예: 결혼식)" maxlength="30" required style="flex:1" />
+          </div>
+          <div class="inline">
+            <div class="money" style="flex:1"><input class="input num" name="amount" data-money inputmode="numeric" placeholder="금액" required /></div>
+            <button class="btn small" type="submit">추가</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
         <h2>이번 달 계산 (${m}월 · ${N}일)</h2>
         <div class="calc-row"><span>월급</span><b class="num">${won(st.salary || 0)}</b></div>
         <div class="calc-row"><span>고정 지출</span><b class="num">-${won(fixedTotal(st))}</b></div>
-        <div class="calc-row"><span>남는 금액</span><b class="num">${won(disp)}</b></div>
+        ${exThis ? `<div class="calc-row"><span>추가 대지출</span><b class="num">-${won(exThis)}</b></div>` : ''}
+        <div class="calc-row"><span>남는 금액</span><b class="num">${won(disp - exThis)}</b></div>
         <div class="calc-row total"><span>오늘 하루 기본 금액</span><b class="num">${won(todayBase)}</b></div>
         <p class="muted" style="margin:10px 0 0">월 중간에 바꾸면 오늘부터 남은 날짜에 나눠서 반영돼요. 원 단위 이하는 내림해요.</p>
       </section>
@@ -341,6 +375,22 @@ function bindSettings() {
     render();
   };
   sal.onkeydown = (e) => { if (e.key === 'Enter') sal.blur(); };
+  document.getElementById('extraForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const fd = new FormData(ev.target);
+    const amount = parseMoney(fd.get('amount'));
+    const name = String(fd.get('name') || '').trim();
+    if (!name || !amount) return;
+    const st = S.data.settings;
+    const item = { id: uid(), month: String(fd.get('month')), name, amount, added: todayStr() };
+    await saveSettings({ ...st, extras: [...(st.extras || []), item] });
+    render();
+  };
+  $app.querySelectorAll('#extraList .del').forEach((b) => (b.onclick = async () => {
+    const st = S.data.settings;
+    await saveSettings({ ...st, extras: (st.extras || []).filter((e) => e.id !== b.dataset.id) });
+    render();
+  }));
   document.getElementById('fixedForm').onsubmit = async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);

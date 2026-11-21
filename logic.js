@@ -15,23 +15,32 @@ export const fixedTotal = (settings) =>
   (settings.fixed || []).reduce((a, f) => a + (Number(f.amount) || 0), 0);
 export const disposableOf = (settings) => (Number(settings.salary) || 0) - fixedTotal(settings);
 
-/** 설정 저장 시 스냅샷 갱신 (같은 날짜면 교체) */
+/** 설정 저장 시 스냅샷 갱신 (같은 날짜면 교체, 직전 값과 같으면 기록하지 않음) */
 export function upsertSnapshot(snapshots, date, disposable) {
-  const rest = snapshots.filter((s) => s.date !== date);
+  const rest = sortSnaps(snapshots.filter((s) => s.date !== date));
+  const prev = rest.filter((s) => s.date < date).pop();
+  if (prev && prev.disposable === disposable) return rest;
   rest.push({ date, disposable });
-  return rest.sort((a, b) => (a.date < b.date ? -1 : 1));
+  return sortSnaps(rest);
 }
 
 const sortSnaps = (snaps) => [...snaps].sort((a, b) => (a.date < b.date ? -1 : 1));
 
+export const monthKey = (y, m) => `${y}-${pad(m)}`;
+/** 해당 월의 추가 대지출 합계 */
+export const extrasTotal = (extras, key) =>
+  (extras || []).filter((e) => e.month === key).reduce((a, e) => a + (Number(e.amount) || 0), 0);
+
 /**
  * 해당 월 각 날짜의 기본 금액 배열 (index 0 = 1일).
- * - 월초 기준 (월급-고정지출) ÷ 일수, 원 단위 내림
- * - 월 중간에 설정이 바뀌면: (새 남는 금액 - 이미 배정된 금액) ÷ 남은 일수 로 그날부터 재배정
+ * - 월초 기준 (월급 - 고정지출 - 그 달 추가 대지출) ÷ 일수, 원 단위 내림
+ * - 월 중간에 설정이 바뀌거나 추가 대지출이 생기면:
+ *   (새 남는 금액 - 이미 배정된 금액) ÷ 남은 일수 로 그날부터 재배정
  * - 첫 설정이 월 중간이면 그날부터 시작 (하루 금액은 동일, 그 이전 날짜는 0)
+ * extras: [{ month: 'YYYY-MM', amount, added: 'YYYY-MM-DD' }]
  * 설정 이전 달이면 null.
  */
-export function monthBases(snapshots, y, m) {
+export function monthBases(snapshots, y, m, extras = []) {
   if (!snapshots || !snapshots.length) return null;
   const snaps = sortSnaps(snapshots);
   const N = daysInMonth(y, m);
@@ -39,26 +48,35 @@ export function monthBases(snapshots, y, m) {
   const end = ymd(y, m, N);
   if (snaps[0].date > end) return null;
 
-  let initIdx = 0;
-  snaps.forEach((s, i) => { if (s.date <= start) initIdx = i; });
+  const startEff = snaps[0].date > start ? snaps[0].date : start;
+  const key = monthKey(y, m);
+  const ex = (extras || []).filter((e) => e.month === key).map((e) => ({
+    amount: Number(e.amount) || 0,
+    // 월 시작 전(미리 등록)이나 날짜가 없으면 그 달 처음부터 적용
+    date: e.added && e.added > startEff && e.added <= end ? e.added : startEff,
+  }));
 
-  const changes = new Map();
-  for (let i = initIdx + 1; i < snaps.length; i++) {
-    const s = snaps[i];
-    if (s.date > start && s.date <= end) changes.set(Number(s.date.slice(8)), s.disposable);
-  }
+  const dispAt = (date) => {
+    let base = snaps[0].disposable;
+    for (const s of snaps) if (s.date <= date) base = s.disposable;
+    return base - ex.filter((e) => e.date <= date).reduce((a, e) => a + e.amount, 0);
+  };
+
+  const changeDays = new Set();
+  for (const s of snaps) if (s.date > startEff && s.date <= end) changeDays.add(Number(s.date.slice(8)));
+  for (const e of ex) if (e.date > startEff) changeDays.add(Number(e.date.slice(8)));
 
   let allocated = 0;
-  let daily = Math.floor(snaps[initIdx].disposable / N);
+  let daily = Math.floor(dispAt(startEff) / N);
   const bases = [];
   for (let d = 1; d <= N; d++) {
-    if (changes.has(d)) daily = Math.floor((changes.get(d) - allocated) / (N - d + 1));
+    if (changeDays.has(d)) daily = Math.floor((dispAt(ymd(y, m, d)) - allocated) / (N - d + 1));
     bases.push(daily);
     allocated += daily;
   }
   // 가계부 시작 전 날짜는 예산 없음
-  if (snaps[0].date > start) {
-    const firstDay = Number(snaps[0].date.slice(8));
+  if (startEff > start) {
+    const firstDay = Number(startEff.slice(8));
     for (let d = 1; d < firstDay; d++) bases[d - 1] = 0;
   }
   return bases;
@@ -75,14 +93,14 @@ function monthSpendTotal(days, y, m) {
 }
 
 /** 이전 달들에서 넘어오는 이월금 (남은 돈/초과 지출 모두 이월) */
-export function carryInto(snapshots, days, y, m) {
+export function carryInto(snapshots, days, y, m, extras = []) {
   if (!snapshots || !snapshots.length) return 0;
   const first = sortSnaps(snapshots)[0].date;
   let cy = Number(first.slice(0, 4));
   let cm = Number(first.slice(5, 7));
   let carry = 0;
   while (cy < y || (cy === y && cm < m)) {
-    const bases = monthBases(snapshots, cy, cm);
+    const bases = monthBases(snapshots, cy, cm, extras);
     if (bases) carry += bases.reduce((a, b) => a + b, 0) - monthSpendTotal(days, cy, cm);
     cm++;
     if (cm > 12) { cm = 1; cy++; }
@@ -96,9 +114,10 @@ export function carryInto(snapshots, days, y, m) {
  * remaining(d) = available(d) - spent(d)  → 다음 날 가용금액에 더해짐 (음수면 빠짐)
  */
 export function computeMonth(state, y, m, today = todayStr()) {
-  const bases = monthBases(state.snapshots, y, m);
+  const extras = state.settings?.extras || [];
+  const bases = monthBases(state.snapshots, y, m, extras);
   if (!bases) return null;
-  const carryIn = carryInto(state.snapshots, state.days, y, m);
+  const carryIn = carryInto(state.snapshots, state.days, y, m, extras);
   let acc = carryIn;
   const out = [];
   const startDate = [...state.snapshots].sort((a, b) => (a.date < b.date ? -1 : 1))[0].date;
