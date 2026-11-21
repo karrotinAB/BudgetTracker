@@ -1,11 +1,11 @@
 import {
   computeMonth, todayStr, daysInMonth, disposableOf, fixedTotal, upsertSnapshot, 
   monthKey, extrasTotal,
-} from './logic.js?v=3';
+} from './logic.js?v=4';
 import {
   firebaseEnabled, watchAuth, startLocal, signInEmail, signUpEmail, signInGoogle, signOut,
   storeFor, authErrorMessage,
-} from './store.js?v=3';
+} from './store.js?v=4';
 
 const $app = document.getElementById('app');
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -40,6 +40,26 @@ function bindMoneyInputs(root) {
     });
   });
 }
+
+// ---------------- 화면 테마 ----------------
+const THEME_KEY = 'gagyebu:theme';
+function getTheme() {
+  try { const t = localStorage.getItem(THEME_KEY); return t === 'light' || t === 'dark' ? t : 'auto'; }
+  catch { return 'auto'; }
+}
+function applyTheme() {
+  const t = getTheme();
+  if (t === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t;
+  const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', dark ? '#4a302c' : '#c9a097');
+}
+function setTheme(t) {
+  try { if (t === 'auto') localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, t); } catch { /* 저장 불가 */ }
+  applyTheme();
+}
+applyTheme();
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
 
 // ---------------- 로그인 ----------------
 function renderLogin(mode = 'signin', err = '') {
@@ -359,6 +379,15 @@ function settingsHTML() {
       </section>
 
       <section class="card">
+        <h2>화면 테마</h2>
+        <div class="seg" id="themeSeg" role="radiogroup" aria-label="화면 테마">
+          ${[['auto', '자동'], ['light', '라이트'], ['dark', '다크']].map(([v, l]) =>
+            `<button type="button" role="radio" aria-checked="${getTheme() === v}" class="${getTheme() === v ? 'on' : ''}" data-theme="${v}">${l}</button>`).join('')}
+        </div>
+        <p class="muted" style="margin:10px 0 0">자동은 휴대폰 설정을 따라가요. 이 기기에만 적용돼요.</p>
+      </section>
+
+      <section class="card">
         <h2>계정</h2>
         <div class="calc-row"><span>${S.user.local ? '체험 모드 (이 기기에만 저장)' : esc(S.user.email || S.user.name || '')}</span></div>
         <button class="btn ghost" id="logout" style="margin-top:8px">${S.user.local ? '체험 모드 종료' : '로그아웃'}</button>
@@ -375,6 +404,7 @@ async function saveSettings(settings) {
 
 function bindSettings() {
   bindMoneyInputs($app);
+  $app.querySelectorAll('#themeSeg button').forEach((b) => (b.onclick = () => { setTheme(b.dataset.theme); render(); }));
   const sal = document.getElementById('salary');
   sal.onchange = async () => {
     await saveSettings({ ...S.data.settings, salary: parseMoney(sal.value) });

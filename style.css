@@ -18,7 +18,7 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #1d1615;
     --card: #2a201e;
     --text: #f3e6e2;
@@ -35,6 +35,27 @@
     color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+    --bg: #1d1615;
+    --card: #2a201e;
+    --text: #f3e6e2;
+    --sub: #b39a93;
+    --faint: #6e5b56;
+    --line: #3a2d2a;
+    --red: #ff7a8a;
+    --blue: #8fb0ec;
+    --accent: #d9798a;
+    --accent-text: #2a1517;
+    --today: #3a2626;
+    --soft: #33272a;
+    --hero: linear-gradient(120deg, #4a302c 0%, #5a3d34 50%, #5e4836 100%);
+    color-scheme: dark;
+}
+
+/* 화면 테마 선택 */
+.seg { display: flex; background: var(--soft); border-radius: 999px; padding: 4px; gap: 4px; }
+.seg button { flex: 1; height: 40px; border: 0; border-radius: 999px; background: transparent; color: var(--sub); font-weight: 600; }
+.seg button.on { background: var(--card); color: var(--accent); box-shadow: 0 1px 3px rgba(90, 40, 30, .12); }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; }
