@@ -85,27 +85,50 @@ export function monthBases(snapshots, y, m, extras = []) {
 export const daySpend = (days, date) =>
   (days[date] || []).reduce((a, e) => a + (Number(e.amount) || 0), 0);
 
-function monthSpendTotal(days, y, m) {
+function monthSpendTotal(days, y, m, fromDate = '') {
   const prefix = `${y}-${pad(m)}-`;
   let t = 0;
-  for (const k of Object.keys(days)) if (k.startsWith(prefix)) t += daySpend(days, k);
+  for (const k of Object.keys(days)) if (k.startsWith(prefix) && k >= fromDate) t += daySpend(days, k);
   return t;
 }
 
-/** 이전 달들에서 넘어오는 이월금 (남은 돈/초과 지출 모두 이월) */
-export function carryInto(snapshots, days, y, m, extras = []) {
-  if (!snapshots || !snapshots.length) return 0;
-  const first = sortSnaps(snapshots)[0].date;
-  let cy = Number(first.slice(0, 4));
-  let cm = Number(first.slice(5, 7));
+const nextMonth = (y, m) => (m === 12 ? [y + 1, 1] : [y, m + 1]);
+
+/**
+ * 한 달의 시작 상태.
+ * - 지난달 남은 돈(+)은 이월금으로 1일에 더해짐
+ * - 지난달 초과 지출(-)은 "초과 지출" 자동 대지출이 되어 그 달 전체에 나눠 빠짐
+ * 반환: { bases, carryIn, debt } (설정 이전 달이면 null)
+ */
+export function monthStart(state, y, m) {
+  const snaps = state.snapshots;
+  if (!snaps || !snaps.length) return null;
+  const extras = state.settings?.extras || [];
+  const days = state.days || {};
+  const startDate = sortSnaps(snaps)[0].date;
+  let cy = Number(startDate.slice(0, 4));
+  let cm = Number(startDate.slice(5, 7));
+  if (cy > y || (cy === y && cm > m)) return null;
   let carry = 0;
-  while (cy < y || (cy === y && cm < m)) {
-    const bases = monthBases(snapshots, cy, cm, extras);
-    if (bases) carry += bases.reduce((a, b) => a + b, 0) - monthSpendTotal(days, cy, cm);
-    cm++;
-    if (cm > 12) { cm = 1; cy++; }
+  for (;;) {
+    const debt = carry < 0 ? -carry : 0;
+    const carryIn = carry > 0 ? carry : 0;
+    const key = monthKey(cy, cm);
+    const ex = debt ? [...extras, { month: key, amount: debt, added: null }] : extras;
+    const bases = monthBases(snaps, cy, cm, ex);
+    if (cy === y && cm === m) return { bases, carryIn, debt, startDate };
+    carry = carryIn + bases.reduce((a, b) => a + b, 0) - monthSpendTotal(days, cy, cm, startDate);
+    [cy, cm] = nextMonth(cy, cm);
   }
-  return carry;
+}
+
+/** 이전 달들에서 넘어오는 금액 (남은 돈이면 +, 초과 지출이면 -) */
+export function carryInto(snapshots, days, y, m, extras = []) {
+  const st = { snapshots, days, settings: { extras } };
+  const [py, pm] = m === 1 ? [y - 1, 12] : [y, m - 1];
+  const prev = monthStart(st, py, pm);
+  if (!prev) return 0;
+  return prev.carryIn + prev.bases.reduce((a, b) => a + b, 0) - monthSpendTotal(days, py, pm, prev.startDate);
 }
 
 /**
@@ -114,13 +137,11 @@ export function carryInto(snapshots, days, y, m, extras = []) {
  * remaining(d) = available(d) - spent(d)  → 다음 날 가용금액에 더해짐 (음수면 빠짐)
  */
 export function computeMonth(state, y, m, today = todayStr()) {
-  const extras = state.settings?.extras || [];
-  const bases = monthBases(state.snapshots, y, m, extras);
-  if (!bases) return null;
-  const carryIn = carryInto(state.snapshots, state.days, y, m, extras);
+  const ms = monthStart(state, y, m);
+  if (!ms) return null;
+  const { bases, carryIn, debt, startDate } = ms;
   let acc = carryIn;
   const out = [];
-  const startDate = [...state.snapshots].sort((a, b) => (a.date < b.date ? -1 : 1))[0].date;
   bases.forEach((base, i) => {
     const date = ymd(y, m, i + 1);
     if (date < startDate) {
@@ -138,6 +159,7 @@ export function computeMonth(state, y, m, today = todayStr()) {
   });
   return {
     carryIn,
+    debt,
     days: out,
     budget: bases.reduce((a, b) => a + b, 0),
     spent: out.reduce((a, d) => a + d.spent, 0),

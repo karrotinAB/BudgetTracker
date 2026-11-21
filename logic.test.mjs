@@ -74,4 +74,22 @@ assert.equal(mo3.budget, 2_000_000 - 300_000);
 // 다음 달 이월도 대지출 반영
 assert.equal(carryInto(snaps, {}, 2026, 12, ex2), 1_700_000);
 
+// 11) 지난달 초과 지출 → 다음 달 전체에 나눠 빠짐 (1일에 몰아서 빠지지 않음)
+// 11월 예산 1,999,980 중 2,309,980 사용 → 31만 초과
+const debtDays = { '2026-11-10': [{ id: 'x', memo: '큰 지출', amount: 2_309_980 }] };
+const st11 = { snapshots: snaps, days: debtDays, settings: { extras: [] } };
+const decM = computeMonth(st11, 2026, 12, '2026-12-01');
+assert.equal(decM.debt, 310_000);
+assert.equal(decM.carryIn, 0);
+assert.equal(decM.days[0].base, Math.floor((2_000_000 - 310_000) / 31));
+assert.equal(decM.days[0].available, decM.days[0].base);
+// 12월을 예산대로 쓰면 1월엔 빚이 남지 않음
+const janM = computeMonth(st11, 2027, 1, '2027-01-01');
+assert.equal(janM.debt, 0);
+assert.ok(janM.carryIn >= 0);
+
+// 12) 시작일 이전 기록은 이월 계산에서도 제외
+const midDays = { '2026-11-05': [{ id: 'y', memo: '시작 전', amount: 999_999 }] };
+assert.equal(computeMonth({ snapshots: mid, days: midDays }, 2026, 12, '2026-12-01').debt, 0);
+
 console.log('all logic tests passed');

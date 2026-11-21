@@ -1,11 +1,11 @@
 import {
-  computeMonth, todayStr, daysInMonth, disposableOf, fixedTotal, upsertSnapshot, monthBases,
+  computeMonth, todayStr, daysInMonth, disposableOf, fixedTotal, upsertSnapshot, 
   monthKey, extrasTotal,
-} from './logic.js?v=2';
+} from './logic.js?v=3';
 import {
   firebaseEnabled, watchAuth, startLocal, signInEmail, signUpEmail, signInGoogle, signOut,
   storeFor, authErrorMessage,
-} from './store.js?v=2';
+} from './store.js?v=3';
 
 const $app = document.getElementById('app');
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -135,7 +135,7 @@ function homeHTML() {
         <div class="label">${m}월 예산</div>
         <div class="big num">${won(mo.budget)}</div>
         <div class="row num">
-          <span>지난달 이월 <b>${num(mo.carryIn)}</b></span>
+          ${mo.debt ? `<span>지난달 초과 <b>-${num(mo.debt)}</b></span>` : `<span>지난달 이월 <b>${num(mo.carryIn)}</b></span>`}
           <span>사용 <b>${num(mo.spent)}</b></span>
         </div>
       </section>`;
@@ -285,8 +285,11 @@ function settingsHTML() {
   const curKey = monthKey(y, m);
   const extras = st.extras || [];
   const exThis = extrasTotal(extras, curKey);
-  const bases = monthBases(S.data.snapshots, y, m, extras);
-  const todayBase = bases ? bases[now.getDate() - 1] : Math.floor((disp - exThis) / N);
+  const curMo = computeMonth(S.data, y, m);
+  const debt = curMo?.debt || 0;
+  const prevM = m === 1 ? 12 : m - 1;
+  const todayX = curMo?.days[now.getDate() - 1];
+  const todayBase = todayX && todayX.status !== 'inactive' ? todayX.base : Math.floor((disp - exThis - debt) / N);
   const months = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(y, m - 1 + i, 1);
     return { key: monthKey(d.getFullYear(), d.getMonth() + 1), label: `${d.getFullYear() !== y ? `${d.getFullYear()}년 ` : ''}${d.getMonth() + 1}월` };
@@ -321,12 +324,13 @@ function settingsHTML() {
 
       <section class="card">
         <h2>추가 대지출</h2>
-        <p class="muted" style="margin:-4px 0 6px">그 달에만 나가는 큰 돈 (경조사비, 여행, 보험 연납 등). 그 달 남은 날짜에서 나눠 빠져요.</p>
+        <p class="muted" style="margin:-4px 0 6px">그 달에만 나가는 큰 돈 (경조사비, 여행, 보험 연납 등). 그 달 남은 날짜에서 나눠 빠져요. 지난달에 예산보다 더 썼으면 그 금액이 자동으로 들어가요.</p>
         <ul class="list" id="extraList">
+          ${debt ? `<li><span class="chip">${m}월</span><span class="name">${prevM}월 초과 지출 <small class="auto">자동</small></span><span class="amt num">${num(debt)}원</span><span class="del" aria-hidden="true"></span></li>` : ''}
           ${shownExtras.map((e) => `
             <li><span class="chip">${labelOf(e.month)}</span><span class="name">${esc(e.name)}</span><span class="amt num">${num(e.amount)}원</span>
             <button class="del" data-id="${e.id}" aria-label="삭제">×</button></li>`).join('')
-            || '<li class="muted">등록된 추가 대지출이 없어요.</li>'}
+            || (debt ? '' : '<li class="muted">등록된 추가 대지출이 없어요.</li>')}
         </ul>
         <form id="extraForm" style="margin-top:12px">
           <div class="inline field">
@@ -347,7 +351,9 @@ function settingsHTML() {
         <div class="calc-row"><span>월급</span><b class="num">${won(st.salary || 0)}</b></div>
         <div class="calc-row"><span>고정 지출</span><b class="num">-${won(fixedTotal(st))}</b></div>
         ${exThis ? `<div class="calc-row"><span>추가 대지출</span><b class="num">-${won(exThis)}</b></div>` : ''}
-        <div class="calc-row"><span>남는 금액</span><b class="num">${won(disp - exThis)}</b></div>
+        ${debt ? `<div class="calc-row"><span>${prevM}월 초과 지출</span><b class="num">-${won(debt)}</b></div>` : ''}
+        ${curMo?.carryIn ? `<div class="calc-row"><span>${prevM}월 남은 돈 (1일에 더해짐)</span><b class="num">+${won(curMo.carryIn)}</b></div>` : ''}
+        <div class="calc-row"><span>남는 금액</span><b class="num">${won(disp - exThis - debt)}</b></div>
         <div class="calc-row total"><span>오늘 하루 기본 금액</span><b class="num">${won(todayBase)}</b></div>
         <p class="muted" style="margin:10px 0 0">월 중간에 바꾸면 오늘부터 남은 날짜에 나눠서 반영돼요. 원 단위 이하는 내림해요.</p>
       </section>
