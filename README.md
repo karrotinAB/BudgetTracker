@@ -33,3 +33,6 @@ python3 -m http.server 8000
 ```bash
 node logic.test.mjs
 ```
+
+## 업데이트 배포 시
+휴대폰 캐시 때문에 예전 화면이 남지 않도록, 코드를 바꾸면 `index.html`, `app.js`, `store.js`의 `?v=숫자`를 모두 1씩 올려주세요.
