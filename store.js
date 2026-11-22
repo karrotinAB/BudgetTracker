@@ -1,5 +1,5 @@
 // 저장소: Firebase(로그인 + 클라우드 동기화) 또는 로컬(체험 모드)
-import { firebaseConfig } from './firebase-config.js?v=5';
+import { firebaseConfig } from './firebase-config.js?v=6';
 
 const FB = 'https://www.gstatic.com/firebasejs/10.12.2';
 export const firebaseEnabled = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);

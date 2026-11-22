@@ -1,11 +1,11 @@
 import {
   computeMonth, todayStr, daysInMonth, disposableOf, fixedTotal, upsertSnapshot, 
   monthKey, extrasTotal,
-} from './logic.js?v=5';
+} from './logic.js?v=6';
 import {
   firebaseEnabled, watchAuth, startLocal, signInEmail, signUpEmail, signInGoogle, signOut,
   storeFor, authErrorMessage,
-} from './store.js?v=5';
+} from './store.js?v=6';
 
 const $app = document.getElementById('app');
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -259,19 +259,19 @@ function openDay(date, { focus = false } = {}) {
           <div class="stat"><small>사용</small><b style="color:var(--red)">${num(x.spent)}</b></div>
           ${x.status === 'future' ? '' : `<div class="stat"><small>남은 돈</small><b style="color:${x.remaining < 0 ? 'var(--red)' : 'var(--blue)'}">${num(x.remaining)}</b></div>`}
         </div>` : `<p class="muted">${x0 ? '가계부 시작 전 날짜예요. 기록은 남길 수 있지만 계산에는 들어가지 않아요.' : '설정을 먼저 입력하면 가용 금액이 계산돼요.'}</p>`}
-      <ul class="list">
-        ${items.length ? items.map((it) => `
-          <li><span class="name">${esc(it.memo || '지출')}</span><span class="amt red num">-${num(it.amount)}</span>
-          <button class="del" data-id="${it.id}" aria-label="삭제">×</button></li>`).join('')
-          : '<li class="muted">아직 사용 내역이 없어요.</li>'}
-      </ul>
-      <form id="addForm" style="margin-top:14px">
+      <form id="addForm" style="margin:14px 0 6px">
         <div class="field money"><input class="input num" name="amount" data-money inputmode="numeric" enterkeyhint="next" placeholder="금액" required /></div>
         <div class="inline">
           <input class="input" name="memo" placeholder="내역 (예: 점심)" maxlength="40" enterkeyhint="done" style="flex:1" />
           <button class="btn small" type="submit">추가</button>
         </div>
-      </form>`;
+      </form>
+      <ul class="list">
+        ${items.length ? [...items].reverse().map((it) => `
+          <li><span class="name">${esc(it.memo || '지출')}</span><span class="amt red num">-${num(it.amount)}</span>
+          <button class="del" data-id="${it.id}" aria-label="삭제">×</button></li>`).join('')
+          : '<li class="muted">아직 사용 내역이 없어요.</li>'}
+      </ul>`;
     bindMoneyInputs(sheet);
     const amountEl = sheet.querySelector('input[name=amount]');
     const memoEl = sheet.querySelector('input[name=memo]');
