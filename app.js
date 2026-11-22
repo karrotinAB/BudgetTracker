@@ -1,11 +1,11 @@
 import {
   computeMonth, todayStr, daysInMonth, disposableOf, fixedTotal, upsertSnapshot, 
   monthKey, extrasTotal,
-} from './logic.js?v=4';
+} from './logic.js?v=5';
 import {
   firebaseEnabled, watchAuth, startLocal, signInEmail, signUpEmail, signInGoogle, signOut,
   storeFor, authErrorMessage,
-} from './store.js?v=4';
+} from './store.js?v=5';
 
 const $app = document.getElementById('app');
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -231,7 +231,8 @@ function bindHome() {
 }
 
 // ---------------- 날짜 상세 (바텀시트) ----------------
-function openDay(date) {
+function openDay(date, { focus = false } = {}) {
+  let focusAmount = focus;
   const [y, m, d] = date.split('-').map(Number);
   const close = () => { bg.remove(); sheet.remove(); render(); };
 
@@ -265,13 +266,18 @@ function openDay(date) {
           : '<li class="muted">아직 사용 내역이 없어요.</li>'}
       </ul>
       <form id="addForm" style="margin-top:14px">
-        <div class="field"><input class="input" name="memo" placeholder="내역 (예: 점심)" maxlength="40" /></div>
+        <div class="field money"><input class="input num" name="amount" data-money inputmode="numeric" enterkeyhint="next" placeholder="금액" required /></div>
         <div class="inline">
-          <div class="money" style="flex:1"><input class="input num" name="amount" data-money inputmode="numeric" placeholder="금액" required /></div>
+          <input class="input" name="memo" placeholder="내역 (예: 점심)" maxlength="40" enterkeyhint="done" style="flex:1" />
           <button class="btn small" type="submit">추가</button>
         </div>
       </form>`;
     bindMoneyInputs(sheet);
+    const amountEl = sheet.querySelector('input[name=amount]');
+    const memoEl = sheet.querySelector('input[name=memo]');
+    // 금액 입력 후 엔터(다음) → 내역으로 이동
+    amountEl.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); if (parseMoney(amountEl.value)) memoEl.focus(); } };
+    if (focusAmount) amountEl.focus();
     sheet.querySelectorAll('.del').forEach((b) => (b.onclick = async () => {
       const next = items.filter((i) => i.id !== b.dataset.id);
       await saveDay(date, next);
@@ -283,6 +289,7 @@ function openDay(date) {
       const amount = parseMoney(fd.get('amount'));
       if (!amount) return;
       await saveDay(date, [...items, { id: uid(), memo: String(fd.get('memo') || '').trim(), amount }]);
+      focusAmount = focus; // 바로가기로 연 경우 연속 입력하기 좋게 금액칸에 다시 포커스
       draw();
       toast('기록했어요');
     };
@@ -460,6 +467,15 @@ function boot() {
     const now = new Date();
     S.view = { y: now.getFullYear(), m: now.getMonth() + 1 };
     S.tab = S.data.snapshots.length ? 'home' : 'settings';
+    // 앱 아이콘 길게 누르기 → "오늘 지출 추가" 바로가기 (?add=today)
+    const params = new URLSearchParams(location.search);
+    if (params.get('add') === 'today') {
+      S.tab = 'home';
+      history.replaceState(null, '', location.pathname);
+      render();
+      openDay(todayStr(), { focus: true });
+      return;
+    }
     render();
   }).catch(() => { $app.innerHTML = '<div class="splash">로그인 서버에 연결하지 못했어요.</div>'; });
 }
