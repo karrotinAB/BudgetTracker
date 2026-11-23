@@ -1,5 +1,5 @@
 // 저장소: Firebase(로그인 + 클라우드 동기화) 또는 로컬(체험 모드)
-import { firebaseConfig } from './firebase-config.js?v=6';
+import { firebaseConfig } from './firebase-config.js?v=7';
 
 const FB = 'https://www.gstatic.com/firebasejs/10.12.2';
 export const firebaseEnabled = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
@@ -53,7 +53,23 @@ async function loadFirebase() {
 
 class FirebaseStore {
   constructor(uid) { this.uid = uid; }
+  /** 일시적인 실패(앱이 두 개 동시에 열리는 순간, 네트워크 준비 전 등)를 대비해 몇 번 재시도 */
   async load() {
+    let lastErr;
+    for (const wait of [0, 700, 2000, 4000]) {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      try { return await this.loadOnce(); } catch (e) {
+        lastErr = e;
+        console.warn('load failed', e);
+        if (e?.code === 'permission-denied' || e?.code === 'unauthenticated') {
+          // 로그인 토큰이 아직 준비 안 됐을 수 있음 → 토큰 새로 받아 재시도
+          try { await fb.auth.currentUser?.getIdToken(true); } catch { /* 무시 */ }
+        }
+      }
+    }
+    throw lastErr;
+  }
+  async loadOnce() {
     const { fsM, db } = fb;
     const userRef = fsM.doc(db, 'users', this.uid);
     const [userSnap, daySnaps] = await Promise.all([

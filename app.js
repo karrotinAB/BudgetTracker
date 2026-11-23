@@ -1,11 +1,11 @@
 import {
   computeMonth, todayStr, daysInMonth, disposableOf, fixedTotal, upsertSnapshot, 
   monthKey, extrasTotal,
-} from './logic.js?v=6';
+} from './logic.js?v=7';
 import {
   firebaseEnabled, watchAuth, startLocal, signInEmail, signUpEmail, signInGoogle, signOut,
   storeFor, authErrorMessage,
-} from './store.js?v=6';
+} from './store.js?v=7';
 
 const $app = document.getElementById('app');
 const won = (n) => `${Math.round(n).toLocaleString('ko-KR')}원`;
@@ -456,6 +456,21 @@ function bindSettings() {
 }
 
 // ---------------- 시작 ----------------
+function showLoadError(e) {
+  const code = e?.code || e?.name || 'unknown';
+  const msg = String(e?.message || e || '').slice(0, 160);
+  $app.innerHTML = `
+    <div class="splash" style="padding:24px;text-align:center">
+      <div>
+        <p style="margin:0 0 6px;font-weight:700">데이터를 불러오지 못했어요</p>
+        <p class="muted" style="margin:0 0 18px">인터넷 연결을 확인하고 다시 시도해주세요.<br/>앱이 두 개 열려 있다면 하나를 닫아주세요.</p>
+        <button class="btn" id="retry" style="max-width:240px">다시 시도</button>
+        <p class="muted" style="margin:18px 0 0;font-size:11px;word-break:break-all">오류 코드: ${esc(code)}<br/>${esc(msg)}</p>
+      </div>
+    </div>`;
+  document.getElementById('retry').onclick = () => location.reload();
+}
+
 function boot() {
   watchAuth(async (user) => {
     if (!user) { S.user = null; renderLogin(); return; }
@@ -463,7 +478,7 @@ function boot() {
     S.store = storeFor(user);
     $app.innerHTML = '<div class="splash">불러오는 중…</div>';
     try { S.data = await S.store.load(); }
-    catch { $app.innerHTML = '<div class="splash">데이터를 불러오지 못했어요. 새로고침 해주세요.</div>'; return; }
+    catch (e) { showLoadError(e); return; }
     const now = new Date();
     S.view = { y: now.getFullYear(), m: now.getMonth() + 1 };
     S.tab = S.data.snapshots.length ? 'home' : 'settings';
